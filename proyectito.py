@@ -1,34 +1,126 @@
+from crypt import methods
+
 import psycopg2
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-# Lista de métodos TODO
-# Asignar gestor a proyecto
-# Asignar cliente a proyecto
-# Crear tareas a proyecto (debe estar asignado)
-# Asignar programador a proyecto
-# Asignar programadores a tareas
-# Obtener programadores
-# Obtener proyectos (activos o todos)
-# Obtener tareas de un proyecto (sin asignar o asignada)
+@app.route('/proyecto/asignar_programador_tarea', methods=['POST'])
+def asignar_programador_tarea():
+    body_request = request.json
+    tarea = body_request["tarea"]
+    programador = body_request["programador"]
 
-@app.route('/asignar/gestor-proyecto', methods=['POST'])
+    query = f"""
+            UPDATE public."Tarea"
+            SET programador = {programador}
+            WHERE id = {tarea}
+        """
+
+    return jsonify(ejecutar_sql(query))
+
+@app.route('/proyecto/programador_proyecto', methods=['POST'])
+def asignar_programador_proyecto():
+    body_request = request.json
+    programador = body_request["programador"]
+    proyecto = body_request["proyecto"]
+    fecha_asignacion = body_request["fecha_asignacion"]
+
+    sql = f"""
+            INSERT INTO public."ProgramadoresProyecto" (programador, proyecto, fecha_asignacion)
+			VALUES (
+			    {programador}, 
+			    {proyecto}, 
+			    '{fecha_asignacion}'
+			)"""
+
+    return jsonify(ejecutar_sql(sql))
+
+@app.route('/proyecto/tarea_proyecto', methods=['POST'])
+def crear_tarea_proyecto():
+    body_request = request.json
+    nombre = body_request["nombre"]
+    descripcion = body_request["descripcion"]
+    estimacion = body_request["estimacion"]
+    fecha_creacion = body_request["fecha_creacion"]
+    fecha_finalizacion = body_request["fecha_finalizacion"]
+    programador = body_request["programador"]
+    proyecto = body_request["proyecto"]
+
+    # consulta para comprobar programador
+    query1 = \
+        f"""
+            SELECT 1 FROM public."ProgramadoresProyecto"
+            WHERE proyecto = {proyecto} AND programador = {programador};
+        """
+
+    comprobacion = ejecutar_sql(query1)
+    if not comprobacion.json:
+        return jsonify({"Error":"El programador no está asignado"})
+
+    query2 = f"""
+            INSERT INTO public."Tarea" (nombre, descripcion, estimacion, fecha_creacion, fecha_finalizacion, programador, proyecto)
+			VALUES (
+			    '{nombre}', 
+			    '{descripcion}', 
+			    {estimacion}, 
+			    '{fecha_creacion}', 
+			    '{fecha_finalizacion}', 
+			    {programador}, 
+			    {proyecto}
+			)"""
+
+    return ejecutar_sql(query2)
+
+@app.route('/proyecto/asignar_cliente_proyecto', methods=['POST'])
+def asignar_cliente_proyecto():
+    body_request = request.json
+    id_cliente = body_request["id_cliente"]
+    id_proyecto = body_request["id_proyecto"]
+
+    query = f"""
+            UPDATE public."Proyecto"
+            SET cliente = {id_cliente}
+            WHERE id = {id_proyecto}
+        """
+
+    return jsonify(ejecutar_sql(query))
+
+@app.route('/proyecto/asignar_gestor_proyecto', methods=['POST'])
 def asignar_gestor_proyecto():
     body_request = request.json
     gestor = body_request["gestor"]
     proyecto = body_request["proyecto"]
 
-    sql = f"""
-    INSERT INTO public."GestoresProyecto"(gestor, proyecto, fecha_asignacion)
-        VALUES (
-            {gestor}, 
-            {proyecto}, 
-            NOW()
-        );
-    """
+    query = f"""
+            INSERT INTO public."GestoresProyecto" (gestor, proyecto, fecha_asignacion)
+            VALUES (
+                {gestor},
+                {proyecto},
+                NOW()
+            )"""
 
-    return jsonify(ejecutar_sql(sql))
+    return jsonify(ejecutar_sql(query))
+
+@app.route('/proyecto/crear_proyecto', methods=['POST'])
+def crear_proyectos():
+    body_request = request.json
+    nombre = body_request["nombre"]
+    descripcion = body_request["descripcion"]
+    fecha_creacion = body_request["fecha_creacion"]
+    fecha_inicio = body_request["fecha_inicio"]
+    cliente = body_request["cliente"]
+
+    query = f"""
+        INSERT INTO public."Proyecto" (nombre, descripcion, fecha_creacion, fecha_inicio, cliente)
+        VALUES (
+            '{nombre}',
+            '{descripcion}',
+            '{fecha_creacion}',
+            '{fecha_inicio}',
+             {cliente}
+        )"""
+    return jsonify(ejecutar_sql(query))
 
 @app.route('/login', methods=['POST'])
 def gestor_login():
@@ -41,8 +133,7 @@ def gestor_login():
     )
 
     if len(is_logged.json) == 0:
-        return jsonify({"msg":"Usuario o contraseña incorrecto"})
-
+        return jsonify({"msg": "Usuario o contraseña incorrectos"})
     empleado = ejecutar_sql(
         f"SELECT * FROM public.\"Empleado\" WHERE id = '{is_logged.json[0]["empleado"]}';"
     )
@@ -56,27 +147,18 @@ def gestor_login():
         }
     )
 
-@app.route('/crear_proyecto', methods=['POST'])
-def crear_proyecto():
-
-    data = request.json
-    id_proyecto = data.get('id')
-    nombre = data.get('nombre')
-    descripcion = data.get('descripcion')
-    fecha_creacion = data.get('fecha_creacion')
-    fecha_inicio = data.get('fecha_inicio')
-    fecha_finalizacion = data.get('fecha_finalizacion')
-    cliente = data.get('cliente')
-
-    ejecutar_sql(
-        f"""
-        INSERT INTO public."Proyecto"(
-            id, nombre, descripcion, fecha_creacion, fecha_inicio, fecha_finalizacion, cliente)
-            VALUES ({id_proyecto}, {nombre}, {descripcion}, {fecha_creacion}, {fecha_inicio}, {fecha_finalizacion}, {cliente});
-        """
+@app.route('/empleado/empleados', methods=['GET'])
+def obtener_lista_empleados():
+    query1 = ejecutar_sql(
+        'SELECT e.nombre AS "nombre", \'Gestor\' AS "empleado" FROM public."Empleado" e INNER JOIN public."Gestor" g ON e.id = g.empleado;'
+    )
+    query2 = ejecutar_sql(
+        'SELECT e.nombre AS "nombre", \'Programador\' AS "empleado" FROM public."Empleado" e INNER JOIN public."Programador" p on e.id = p.empleado;'
     )
 
-    return jsonify({"message": "Proyecto creado exitosamente"}), 201
+    lista_empleados = query1.json + query2.json
+
+    return jsonify(lista_empleados)
 
 @app.route('/proyecto/proyectos_gestor', methods=['GET'])
 def obtener_proyectos_gestor_id():
@@ -93,6 +175,14 @@ def obtener_proyectos_gestor_id():
 
     return ejecutar_sql(query)
 
+@app.route('/proyecto/tareas_proyectos', methods=['GET'])
+def obtener_tareas_proyectos():
+    proyecto_id = request.args.get('id')
+
+    sql = f'SELECT * FROM public."Tarea" WHERE proyecto = {proyecto_id}'
+
+    return ejecutar_sql(sql)
+
 
 @app.route('/proyecto/proyectos_activos', methods=['GET'])
 def obtener_proyectos_activos():
@@ -104,6 +194,13 @@ def obtener_proyectos_activos():
 def obtener_proyectos():
     return ejecutar_sql(
         'SELECT * FROM public."Proyecto"'
+    )
+
+@app.route('/proyecto/programadores', methods=['GET'])
+def obtener_programadores():
+
+    return ejecutar_sql(
+        f'SELECT * FROM public."Programador";'
     )
 
 @app.route('/hola_mundo', methods=['GET'])
@@ -145,6 +242,18 @@ def ejecutar_sql(query = ""):
 
         cursor = connection.cursor()
         cursor.execute(query)
+
+        if "UPDATE" in query:
+            connection.commit()
+            cursor.close()
+            connection.close()
+            return jsonify({'msg': 'actualizado'})
+
+        if "INSERT" in query:
+            connection.commit()
+            cursor.close()
+            connection.close()
+            return jsonify({'msg': 'insertado'})
 
         # Obtener columnas para construit claves JSON
         columnas = [desc[0] for desc in cursor.description]
