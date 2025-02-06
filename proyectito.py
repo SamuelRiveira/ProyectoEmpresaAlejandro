@@ -122,7 +122,7 @@ def crear_proyectos():
         )"""
     return jsonify(ejecutar_sql(query))
 
-@app.route('/login', methods=['POST'])
+@app.route('/gestor/login', methods=['POST'])
 def gestor_login():
     body_request = request.json
     user = body_request["usuario"]
@@ -135,7 +135,7 @@ def gestor_login():
     if len(is_logged.json) == 0:
         return jsonify({"msg": "Usuario o contraseña incorrectos"})
     empleado = ejecutar_sql(
-        f"SELECT * FROM public.\"Empleado\" WHERE id = '{is_logged.json[0]["empleado"]}';"
+        f"SELECT * FROM public.\"Empleado\" WHERE id = '{is_logged.json[0]['empleado']}';"
     )
 
     return jsonify(
