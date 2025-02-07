@@ -125,7 +125,7 @@ def crear_proyectos():
 @app.route('/gestor/login', methods=['POST'])
 def gestor_login():
     body_request = request.json
-    user = body_request["usuario"]
+    user = body_request["user"]
     passwd = body_request["passwd"]
 
     is_logged = ejecutar_sql(
@@ -135,7 +135,7 @@ def gestor_login():
     if len(is_logged.json) == 0:
         return jsonify({"msg": "Usuario o contraseña incorrectos"})
     empleado = ejecutar_sql(
-        f"SELECT * FROM public.\"Empleado\" WHERE id = '{is_logged.json[0]['empleado']}';"
+        f"SELECT * FROM public.\"Empleado\" WHERE id = '{is_logged.json[0]["empleado"]}';"
     )
 
     return jsonify(
