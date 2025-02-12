@@ -19,6 +19,19 @@ def asignar_programador_tarea():
 
     return jsonify(ejecutar_sql(query))
 
+
+@app.route('/proyecto/programadores_no_asignados', methods=['GET'])
+def obtener_programadores_no_asignados():
+    sql = """
+    SELECT p.id, p.sueldo_hora, p.empleado
+    FROM public."Programador" p
+    LEFT JOIN public."ProgramadoresProyecto" pp ON p.id = pp.programador
+    WHERE pp.proyecto IS NULL
+    ORDER BY p.id ASC;
+    """
+
+    return jsonify(ejecutar_sql(sql))
+
 @app.route('/proyecto/programador_proyecto', methods=['POST'])
 def asignar_programador_proyecto():
     body_request = request.json
